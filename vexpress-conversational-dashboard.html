@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>V-Express AI Conversational Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emotion/react@11.11.0/dist/emotion-react.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emotion/styled@11.11.0/dist/emotion-styled.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Thêm Lottie Web (Thiếu ở bản trước) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+  <style>
+    :root { --cyan: #22d3ee; --rose: #fb7185; --emerald: #34d399; --amber: #fbbf24; --slate: #1e293b; }
+    body { margin: 0; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; overflow-x: hidden; }
+    #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.4; }
+    body::before { content: ''; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 20% 20%, rgba(34,211,238,.12), transparent 25%), radial-gradient(circle at 80% 30%, rgba(251,113,133,.10), transparent 22%), radial-gradient(circle at 50% 80%, rgba(52,211,153,.10), transparent 28%); z-index: -1; }
+    .glass { background: rgba(15, 23, 42, 0.64); backdrop-filter: blur(22px) saturate(140%); border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.04); }
+    .neon-cyan { box-shadow: 0 0 24px rgba(34, 211, 238, 0.32), inset 0 0 10px rgba(34, 211, 238, 0.08); border: 1px solid rgba(34, 211, 238, 0.42); }
+    .neon-rose { box-shadow: 0 0 24px rgba(251, 113, 133, 0.28), inset 0 0 10px rgba(251, 113, 133, 0.08); border: 1px solid rgba(251, 113, 133, 0.42); }
+    .neon-emerald { box-shadow: 0 0 24px rgba(52, 211, 153, 0.28), inset 0 0 10px rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.42); }
+    .neon-amber { box-shadow: 0 0 24px rgba(251, 191, 36, 0.28), inset 0 0 10px rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.42); }
+    .gridline { background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px); background-size: 32px 32px; }
+    .badge { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(15,23,42,.7); border:1px solid rgba(148,163,184,.18); }
+    .card-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #94a3b8; font-weight: 700; }
+    .stat { font-size: 32px; font-weight: 900; line-height: 1; }
+    .btn { padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; transition: all 0.2s; }
+    .btn:hover { transform: translateY(-2px); filter: brightness(1.2); }
+    .btn-cyan { background: linear-gradient(135deg, #22d3ee, #0891b2); color: #0f172a; }
+    .btn-rose { background: linear-gradient(135deg, #fb7185, #e11d48); color: white; }
+    .btn-emerald { background: linear-gradient(135deg, #34d399, #059669); color: #0f172a; }
+    .chip { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; }
+    .typing-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; animation: typing 1.4s infinite; }
+    @keyframes typing { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.5; }
+    .chat-user { background: rgba(34, 211, 238, 0.15); border: 1px solid rgba(34, 211, 238, 0.3); color: #cffafe; margin-left: auto; border-bottom-right-radius: 4px; }
+    .chat-ai { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); color: #d1fae5; margin-right: auto; border-bottom-left-radius: 4px; }
+    .pulse-ring { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--cyan); animation: pulse-ring 2s infinite; }
+    @keyframes pulse-ring { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+  </style>
+</head>
+<body class="gridline">
+  <canvas id="bg-canvas"></canvas>
+  <div id="root"></div>
+
+  <!-- Lottie JSON -->
+  <script>
+    window.successAnim = {"v":"5.5.2","fr":60,"ip":0,"op":60,"w":100,"h":100,"nm":"Bounce","ddd":0,"assets":[],"layers":[{"ddd":0,"ind":1,"ty":4,"nm":"Ball","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":1,"k":[{"i":{"x":0.833,"y":0.833},"o":{"x":0.167,"y":0.167},"t":0,"s":[50,20,0],"to":[0,20,0],"ti":[0,-20,0]},{"i":{"x":0.833,"y":0.833},"o":{"x":0.167,"y":0.167},"t":30,"s":[50,80,0],"to":[0,-20,0],"ti":[0,20,0]},{"t":60,"s":[50,20,0]}],"ix":2},"a":{"a":0,"k":[0,0,0],"ix":1},"s":{"a":0,"k":[100,100,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"d":1,"ty":"el","s":{"a":0,"k":[40,40],"ix":2},"p":{"a":0,"k":[0,0],"ix":3},"nm":"Ellipse Path 1","mn":"ADBE Vector Shape - Ellipse","hd":false},{"ty":"fl","c":{"a":0,"k":[0.2,0.8,0.5,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Fill 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[0,0],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transform"}],"nm":"Ellipse 1","np":3,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":60,"st":0,"bm":0}]};
+  </script>
+
+  <!-- React entry -->
+  <script type="module">
+    const { useState, useEffect, useRef } = React;
+
+    /* ---------- Three.js Background ---------- */
+    function initThree() {
+      const canvas = document.getElementById('bg-canvas');
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.position.z = 30;
+
+      // particle system
+      const particles = 1500;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(particles * 3);
+      for (let i = 0; i < particles; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 200;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+      }
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({ color: 0x22d3ee, size: 1.5 });
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        points.rotation.x += 0.001;
+        points.rotation.y += 0.0015;
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      window.addEventListener('resize', () => {
+        const w = window.innerWidth, h = window.innerHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      });
+    }
+    initThree();
+
+    /* ---------- UI Components ---------- */
+    const Card = ({ children, className = '' }) => {
+      return React.createElement('div', { className: `glass p-6 ${className}` }, children);
+    };
+
+    const Button = ({color='cyan', children, onClick}) => {
+      const base = 'btn mr-2 ';
+      const map = {cyan:'btn-cyan', rose:'btn-rose', emerald:'btn-emerald'};
+      return React.createElement('button',{className:base+map[color],onClick},children);
+    };
+
+    const ChatBubble = ({from, text}) => {
+      const cls = from==='ai'?'chat-ai':'chat-user';
+      return React.createElement('div',{className:'flex my-2'}, 
+        React.createElement('div',{className:`chat-bubble ${cls}`},text)
+      );
+    };
+
+    const TypingIndicator = () => {
+      return React.createElement('div',{className:'flex gap-1 py-2'},
+        React.createElement('div',{className:'typing-dot'}), 
+        React.createElement('div',{className:'typing-dot'}), 
+        React.createElement('div',{className:'typing-dot'})
+      );
+    };
+
+    function App() {
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState('');
+      const [loading, setLoading] = useState(false);
+      const [incident, setIncident] = useState('Healthy');
+      const [wsStatus, setWsStatus] = useState('Connected');
+      const [insight, setInsight] = useState('Agent ready. Ask me anything.');
+      const [timeline, setTimeline] = useState([
+        { t: '00:00', msg: 'System booted. All agents green.', tone: 'emerald' },
+      ]);
+      const [health, setHealth] = useState({ orch: 98, inv: 91, db: 96, ship: 94 });
+      const [fileData, setFileData] = useState(null);
+      const [fileInsight, setFileInsight] = useState(null);
+      const inputRef = useRef();
+      const lottieContainerRef = useRef();
+      const wsTimerRef = useRef(null);
+      const chatTimerRef = useRef(null);
+      const pulseRef = useRef(null);
+      const fileInputRef = useRef();
+
+      useEffect(() => {
+        if (lottieContainerRef.current) {
+          lottie.loadAnimation({
+            container: lottieContainerRef.current,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData: window.successAnim
+          });
+        }
+      }, []);
+
+      const pushSystemEvent = (text, tone='cyan') => {
+        setMessages(prev => [...prev, { from: 'ai', text }]);
+        const ts = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+        setTimeline(prev => [{ t: ts, msg: text, tone }, ...prev].slice(0, 8));
+      };
+
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        pushSystemEvent(`📂 Đọc file: ${file.name}...`, 'cyan');
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+          const text = event.target.result;
+          let parsed = null;
+          let error = false;
+
+          try {
+            if (file.name.endsWith('.json')) {
+              parsed = JSON.parse(text);
+            } else {
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+              if (lines.length > 0) {
+                const headers = lines[0].split(',');
+                const rows = lines.slice(1).map(line => {
+                  const vals = line.split(',');
+                  const obj = {};
+                  headers.forEach((h, idx) => { obj[h.trim()] = vals[idx]?.trim() || ''; });
+                  return obj;
+                });
+                parsed = { headers, rows };
+              }
+            }
+          } catch (err) { error = true; }
+
+          if (error || !parsed) {
+            pushSystemEvent('❌ Lỗi format file (.csv/.json)', 'rose');
+          } else {
+            setFileData(parsed);
+            pushSystemEvent('✅ Upload file thành công. Đang gửi dữ liệu đến backend FastAPI...', 'emerald');
+            setLoading(true);
+            setInsight('AI đang phân tích dữ liệu file...');
+
+            const uploadAndAnalyze = async () => {
+              try {
+                const form = new FormData();
+                form.append('file', file);
+                await fetch('http://localhost:8000/upload', { method: 'POST', body: form });
+                const res = await fetch('http://localhost:8000/analyze', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ message: 'Phân tích file upload', data: text })
+                });
+                const data = await res.json();
+                setFileInsight(data.reply);
+                pushSystemEvent(`🟩 [AI Insight] ${data.reply}`, 'emerald');
+                setInsight('Phân tích file hoàn tất.');
+              } catch (err) {
+                const summary = file.name.endsWith('.json') 
+                  ? 'Dữ liệu JSON hợp lệ. Đã trích xuất cấu trúc và tối ưu hóa bộ nhớ Agent.'
+                  : `Đã đọc ${parsed.rows.length} dòng. Phát hiện cột: ${parsed.headers.join(', ')}. Đề xuất: Tối ưu tải kho 20%.`;
+                setFileInsight(summary);
+                pushSystemEvent(`🟩 [AI Insight] ${summary}`, 'emerald');
+                setInsight('Phân tích file hoàn tất (Mock).');
+              } finally {
+                setLoading(false);
+              }
+            };
+            uploadAndAnalyze();
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      const renderFileData = () => {
+        if (!fileData) return null;
+        if (fileData.headers) {
+          // CSV table
+          return React.createElement('div', { className: 'overflow-x-auto' },
+            React.createElement('table', { className: 'min-w-full text-sm border-separate border-spacing-0' },
+              React.createElement('thead', null,
+                React.createElement('tr', null,
+                  fileData.headers.map(h => React.createElement('th', { key: h, className: 'sticky top-0 bg-slate-900/50 border-b border-slate-700/50 p-2 text-left text-xs font-semibold uppercase text-slate-400' }, h))
+                )
+              ),
+              React.createElement('tbody', null,
+                fileData.rows.slice(0, 5).map((row, i) => 
+                  React.createElement('tr', { key: i, className: i % 2 === 0 ? 'bg-slate-800/40' : 'bg-slate-800/20' },
+                    fileData.headers.map(h => React.createElement('td', { key: h, className: 'p-2 text-slate-300 whitespace-nowrap border-b border-slate-700/50' }, row[h]))
+                  )
+                )
+              )
+            ),
+            fileData.rows.length > 5 && React.createElement('p', { className: 'text-xs text-slate-500 mt-2' }, `... ${fileData.rows.length - 5} more rows`)
+          );
+        } else {
+          // JSON view
+          return React.createElement('pre', { className: 'text-xs text-slate-300 bg-slate-900/50 p-3 rounded whitespace-pre-wrap overflow-auto max-h-64' }, JSON.stringify(fileData, null, 2));
+        }
+      };
+
+      const startMockBackend = () => {
+        clearInterval(wsTimerRef.current);
+        setWsStatus('Streaming');
+        pushSystemEvent('🔌 Backend giả lập connected', 'emerald');
+        wsTimerRef.current = setInterval(() => {
+          const r = Math.random();
+          if (r < 0.25) {
+            setIncident('Incident');
+            setHealth({ orch: 62, inv: 48, db: 55, ship: 66 });
+            setInsight('⚠️ Incident detected. Auto mitigation running...');
+            pushSystemEvent('⚠️ Incident: warehouse temperature spike', 'rose');
+          } else if (r < 0.6) {
+            setIncident('Healthy');
+            setHealth({ orch: 98, inv: 91, db: 96, ship: 94 });
+            setInsight('✅ System healthy. Live metrics synced.');
+            pushSystemEvent('🟩 Live metrics synced from mock backend', 'emerald');
+          } else {
+            pushSystemEvent('🟦 heartbeat: agent memory synced', 'cyan');
+          }
+        }, 3200);
+      };
+
+
+      const sendMessage = async () => {
+        if (!input.trim()) return;
+        const userMsg = {from:'user', text:input};
+        setMessages(prev=>[...prev,userMsg]);
+        setInput('');
+        setLoading(true);
+        setInsight('AI đang suy nghĩ...');
+        setWsStatus('Streaming');
+        gsap.to(pulseRef.current, { scale: 1.08, duration: 0.3, yoyo: true, repeat: 3 });
+
+        try {
+          const response = await fetch('http://localhost:8000/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userMsg.text })
+          });
+          const data = await response.json();
+          setInsight('Insight ready.');
+          pushSystemEvent(`🟩 ${data.reply}`, 'emerald');
+          setLoading(false);
+          setWsStatus('Connected');
+        } catch (err) {
+          // Fallback to mock if server is down
+          let step = 0;
+          const stream = [
+            'Đang đọc ngữ cảnh dashboard...',
+            'Đang truy xuất dữ liệu PostgreSQL/Redis...',
+            'Đang tổng hợp insight và đề xuất hành động...',
+            `Phân tích \"${userMsg.text}\" → Hệ thống đang ổn định. Đã ghi nhận request vào bộ nhớ.`
+          ];
+          clearInterval(chatTimerRef.current);
+          chatTimerRef.current = setInterval(() => {
+            const t = stream[step];
+            if (step < stream.length - 1) {
+              setInsight(t);
+              pushSystemEvent(`🟦 ${t}`, 'cyan');
+              step++;
+            } else {
+              setInsight('Insight ready (Mock).');
+              pushSystemEvent(`🟩 ${t}`, 'emerald');
+              setLoading(false);
+              setWsStatus('Connected');
+              clearInterval(chatTimerRef.current);
+            }
+          }, 650);
+        }
+      };
+
+      useEffect(()=>{
+        inputRef.current?.focus();
+        gsap.from(".card-anim", { duration: 0.8, y: 30, opacity: 0, stagger: 0.15, ease: "power2.out" });
+        startMockBackend();
+        return () => { clearInterval(wsTimerRef.current); clearInterval(chatTimerRef.current); };
+      },[]);
+
+      return React.createElement('div',{className:'max-w-6xl mx-auto p-4 space-y-6'},
+        React.createElement('div',{className:'text-center mb-6 relative'},
+          React.createElement('div',{ref:pulseRef, className:'absolute left-1/2 -translate-x-1/2 -top-3 w-20 h-20 opacity-70'},
+            React.createElement('div',{className:'pulse-ring'}),
+            React.createElement('div',{className:'absolute inset-3 rounded-full bg-cyan-400/20 blur-xl'})
+          ),
+          React.createElement('div',{className:'inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/70 border border-cyan-400/30 mb-3'},
+            React.createElement('span',{className:`w-2.5 h-2.5 rounded-full ${wsStatus==='Connected'?'bg-emerald-400 animate-pulse':'bg-rose-400'}`}),
+            React.createElement('span',{className:'text-xs uppercase tracking-[0.2em] text-slate-300'},`WebSocket: ${wsStatus}`)
+          ),
+          React.createElement('h1',{className:'text-4xl font-black text-cyan-300 mb-2 animate__animated animate__fadeInDown'},
+            'V‑Express AI Conversational Dashboard'
+          ),
+          React.createElement('p',{className:'text-slate-300'},
+            'Real‑time health monitoring + AI insights'
+          ),
+          React.createElement('div',{className:'mt-4 p-3 rounded-xl bg-slate-900/70 border border-cyan-400/20 text-cyan-200 text-sm neon-cyan'}, insight),
+          React.createElement('div',{className:'mt-4 flex flex-wrap justify-center gap-2'},
+            React.createElement(Button,{color:'cyan',onClick:startMockBackend},'Start Mock Backend'),
+            React.createElement(Button,{color:'rose',onClick:()=>{clearInterval(wsTimerRef.current);setWsStatus('Disconnected');pushSystemEvent('🔴 Mock backend stopped','rose')}},'Stop Stream'),
+            React.createElement(Button,{color:'emerald',onClick:()=>{setIncident('Healthy');setHealth({orch:98,inv:91,db:96,ship:94});pushSystemEvent('✅ Manual recovery applied','emerald')}},'Force Recover')
+          )
+        ),
+
+        React.createElement('div',{className:'grid grid-cols-1 md:grid-cols-4 gap-4'},
+          React.createElement(Card,{className:'neon-cyan card-anim'},
+            React.createElement('div',{className:'card-title'},'Orchestrator'),
+            React.createElement('div',{className:'stat text-cyan-300'},incident==='Incident'?'DEADLOCK':'HEALTHY'),
+            React.createElement('p',{className:'text-slate-400 mt-2'},`Latency ${incident==='Incident'?'10,000':'50'} ms`),
+            React.createElement('div',{className:'mt-3 h-2 rounded-full bg-slate-700 overflow-hidden'},
+              React.createElement('div',{className:'h-full bg-cyan-400',style:{width:`${health.orch}%`}})
+            )
+          ),
+          React.createElement(Card,{className:'neon-emerald card-anim'},
+            React.createElement('div',{className:'card-title'},'Agent Kho'),
+            React.createElement('div',{className:'stat text-emerald-300'},incident==='Incident'?'BUSY':'NORMAL'),
+            React.createElement('p',{className:'text-slate-400 mt-2'},incident==='Incident'?'Queue 18,420':'Queue 0'),
+            React.createElement('div',{className:'mt-3 h-2 rounded-full bg-slate-700 overflow-hidden'},
+              React.createElement('div',{className:'h-full bg-emerald-400',style:{width:`${health.inv}%`}})
+            )
+          ),
+          React.createElement(Card,{className:'neon-amber card-anim'},
+            React.createElement('div',{className:'card-title'},'PostgreSQL'),
+            React.createElement('div',{className:'stat text-amber-300'},incident==='Incident'?'HOT':'50 ms'),
+            React.createElement('p',{className:'text-slate-400 mt-2'},incident==='Incident'?'Connections 120':'Connections 12'),
+            React.createElement('div',{className:'mt-3 h-2 rounded-full bg-slate-700 overflow-hidden'},
+              React.createElement('div',{className:'h-full bg-amber-400',style:{width:`${health.db}%`}})
+            )
+          ),
+          React.createElement(Card,{className:'neon-rose card-anim'},
+            React.createElement('div',{className:'card-title'},'Circuit Breaker'),
+            React.createElement('div',{className:'stat text-rose-300'},incident==='Incident'?'OPEN':'CLOSED'),
+            React.createElement('p',{className:'text-slate-400 mt-2'},'Logic 5-timeout → OPEN'),
+            React.createElement('div',{className:'mt-3 h-2 rounded-full bg-slate-700 overflow-hidden'},
+              React.createElement('div',{className:'h-full bg-rose-400',style:{width:`${health.ship}%`}})
+            )
+          )
+        ),
+
+        React.createElement('div',{className:'mt-8 card-anim'},
+          React.createElement('h2',{className:'text-2xl font-bold text-cyan-200 mb-4'},"AI Insight Widgets"),
+          React.createElement('div',{className:'grid grid-cols-1 lg:grid-cols-2 gap-6'},
+            React.createElement(Card,{className:'neon-cyan'},
+              React.createElement('div',{className:'flex items-center justify-between mb-2'},
+                React.createElement('h3',{className:'text-lg font-medium text-cyan-300'},"Phân tích Tồn kho (Upload)"),
+                React.createElement(Button,{color:'cyan',onClick:()=>fileInputRef.current?.click()},'📂 Upload File')
+              ),
+              React.createElement('input',{ref:fileInputRef,type:'file',accept:'.csv,.json',className:'hidden',onChange:handleFileUpload}),
+              fileData ? 
+                React.createElement('div',{className:'mt-3 space-y-3'},
+                  renderFileData(),
+                  fileInsight && React.createElement('div',{className:'p-3 rounded-lg bg-emerald-500/10 border border-emerald-400/20 text-emerald-200 text-sm'}, fileInsight)
+                ) :
+                React.createElement('div',{className:'flex items-center gap-4 mt-4'},
+                  React.createElement('div',{ref:lottieContainerRef, className:'w-16 h-16'}),
+                  React.createElement('p',{className:'text-slate-300 text-sm'},'Nhấn "Upload File" để tải dữ liệu CSV/JSON lên. AI sẽ phân tích và hiển thị bảng.')
+                )
+            ),
+            React.createElement(Card,{className:'neon-emerald'},
+              React.createElement('div',{className:'flex items-center justify-between mb-2'},
+                React.createElement('h3',{className:'text-lg font-medium text-emerald-300'},"Trạng thái Vận chuyển"),
+                React.createElement(Button,{color:'emerald',onClick:()=>alert('Asking AI...')},'Ask AI')
+              ),
+              React.createElement('div',{className:'mt-4 text-sm text-slate-300'},'Giao diện kết nối trực tiếp với Agent Vận chuyển. Nếu có tắc đường, AI sẽ chủ động push thông báo lên widget này.')
+            )
+          )
+        ),
+
+        React.createElement('div',{className:'grid grid-cols-1 lg:grid-cols-3 gap-4 mt-8 card-anim'},
+          React.createElement(Card,{className:'neon-cyan'},
+            React.createElement('h3',{className:'text-lg font-medium text-cyan-300 mb-2'},"Self-Healing / Incident"),
+            React.createElement('div',{className:'space-y-2 text-sm text-slate-300'},
+              React.createElement('div',null,'CB: OPEN → HALF-OPEN → CLOSED'),
+              React.createElement('div',null,'Queue: 18,420 → 5,200 → 42'),
+              React.createElement('div',null,'DB latency: 10,000ms → 650ms → 65ms')
+            ),
+            React.createElement('div',{className:'flex gap-2 mt-4'},
+              React.createElement(Button,{color:'rose',onClick:()=>setMessages(p=>[...p,{from:'ai',text:'⚠️ Deadlock detected. Circuit Breaker OPEN. Graceful degradation active.'}])},'Simulate'),
+              React.createElement(Button,{color:'emerald',onClick:()=>setMessages(p=>[...p,{from:'ai',text:'✅ Recovered. Reconciliation done. State synced.'}])},'Recover')
+            )
+          ),
+          React.createElement(Card,{className:'neon-emerald'},
+            React.createElement('h3',{className:'text-lg font-medium text-emerald-300 mb-2'},"WebSocket Push"),
+            React.createElement('div',{className:'space-y-2 text-sm text-slate-300'},
+              React.createElement('div',null,'• Agent push: Shipment delayed'),
+              React.createElement('div',null,'• Agent push: Warehouse fire alert'),
+              React.createElement('div',null,'• Agent push: Inventory threshold hit')
+            ),
+            React.createElement('div',{className:'mt-4 p-3 rounded-lg bg-slate-800/80 border border-emerald-500/30 animate__animated animate__pulse animate__infinite'},'Streaming: connected')
+          ),
+          React.createElement(Card,{className:'neon-rose'},
+            React.createElement('h3',{className:'text-lg font-medium text-rose-300 mb-2'},"Human-in-the-loop"),
+            React.createElement('div',{className:'space-y-2 text-sm text-slate-300'},
+              React.createElement('div',null,'AI đề xuất route mới + reallocate stock'),
+              React.createElement('div',null,'Chờ phê duyệt trước khi apply')
+            ),
+            React.createElement('div',{className:'flex gap-2 mt-4'},
+              React.createElement(Button,{color:'emerald',onClick:()=>setMessages(p=>[...p,{from:'user',text:'Approve action'}])},'Approve'),
+              React.createElement(Button,{color:'rose',onClick:()=>setMessages(p=>[...p,{from:'user',text:'Reject action'}])},'Reject')
+            )
+          )
+        ),
+
+        React.createElement('div',{className:'grid grid-cols-1 lg:grid-cols-2 gap-4 mt-8 card-anim'},
+          React.createElement(Card,{className:'neon-cyan'},
+            React.createElement('h3',{className:'text-lg font-medium text-cyan-300 mb-3'},"Event Timeline"),
+            React.createElement('div',{className:'space-y-3 max-h-72 overflow-y-auto pr-1'},
+              timeline.map((item, i) => React.createElement('div',{key:i,className:'flex items-start gap-3'},
+                React.createElement('div',{className:`mt-1 w-2.5 h-2.5 rounded-full ${item.tone==='emerald'?'bg-emerald-400':item.tone==='rose'?'bg-rose-400':'bg-cyan-400'} animate-pulse`}),
+                React.createElement('div',{className:'flex-1'},
+                  React.createElement('div',{className:'text-xs text-slate-400'}, item.t),
+                  React.createElement('div',{className:'text-sm text-slate-200'}, item.msg)
+                )
+              ))
+            )
+          ),
+          React.createElement(Card,{className:'neon-rose'},
+            React.createElement('h3',{className:'text-lg font-medium text-rose-300 mb-2'},"AI Assistant Chat (Context-Aware)"),
+            React.createElement('div',{className:'max-h-64 overflow-y-auto p-2 space-y-2'},
+              messages.map((m,i)=>React.createElement(ChatBubble,{key:i,from:m.from,text:m.text})),
+              loading && React.createElement(TypingIndicator, null)
+            ),
+            React.createElement('div',{className:'flex mt-4'},
+              React.createElement('input',{
+                ref:inputRef,
+                className:'flex-1 p-3 rounded-lg bg-slate-800 text-slate-200 border border-slate-600 focus:outline-none focus:border-rose-400',
+                type:'text',
+                value:input,
+                placeholder:'VD: "Đề xuất phương án xử lý hàng đang tắc tại biên giới..."',
+                onChange:e=>setInput(e.target.value),
+                onKeyDown:e=>{if(e.key==='Enter') sendMessage();}
+              }),
+              React.createElement('div', {className:'ml-2'},
+                React.createElement(Button,{color:'rose',onClick:sendMessage},'Send')
+              )
+            )
+          )
+        )
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
