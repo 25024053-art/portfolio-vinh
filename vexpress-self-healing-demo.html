@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>V-Express Self-Healing Multi-Agent Demo</title>
+  <!-- TAILWIND CSS (repo 1) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          animation: {
+            'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+  <!-- ANIMATE.CSS (repo 3) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <!-- REACT (for Chakra-style components - repo 2 pattern) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <style>
+    body { background: radial-gradient(ellipse at top, #172554 0%, #020617 50%, #020617 100%); }
+    .glass { background: rgba(15,23,42,0.72); backdrop-filter: blur(16px); border: 1px solid rgba(148,163,184,0.22); }
+    .card { border-radius: 18px; box-shadow: 0 10px 35px rgba(0,0,0,0.35); }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .btn-chakra { padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; border: none; color: white; }
+    .btn-chakra:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .btn-red { background: linear-gradient(135deg, #e11d48, #be123c); }
+    .btn-green { background: linear-gradient(135deg, #059669, #047857); }
+    .btn-blue { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+    .progress-bar { height: 8px; border-radius: 9999px; transition: all 0.6s ease; }
+    .state-step { transition: all 0.4s ease; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100 font-sans">
+  <div id="root"></div>
+
+<script>
+const e = React.createElement;
+const { useState, useEffect } = React;
+
+/* ─── Chakra-style Component Library (repo 2 pattern) ─── */
+function ChakraButton({color, children, onClick, className}) {
+  return e('button', { className: `btn-chakra btn-${color} ${className||''}`, onClick }, children);
+}
+function ChakraCard({children, className, id}) {
+  return e('div', { className: `glass card p-5 ${className||''}`, id }, children);
+}
+function ChakraHeading({size, children, className}) {
+  const sizes = { '2xl': 'text-4xl md:text-5xl', xl: 'text-2xl', lg: 'text-xl', md: 'text-lg' };
+  return e('h2', { className: `font-extrabold tracking-tight ${sizes[size]||'text-xl'} ${className||''}` }, children);
+}
+function ChakraText({size, color, weight, children, className}) {
+  const colors = { 'cyan.300': 'text-cyan-300', 'slate.300': 'text-slate-300', 'slate.400': 'text-slate-400',
+    'emerald.300': 'text-emerald-300', 'rose.300': 'text-rose-300', 'amber.300': 'text-amber-300', 'cyan.400': 'text-cyan-400' };
+  const sizes2 = { sm: 'text-sm', xs: 'text-xs', '2xl': 'text-2xl' };
+  const weights = { semibold: 'font-semibold', bold: 'font-bold' };
+  return e('p', { className: `${colors[color]||''} ${sizes2[size]||''} ${weights[weight]||''} ${className||''}` }, children);
+}
+function ChakraBadge({color, children}) {
+  const colors = { green: 'bg-emerald-600', red: 'bg-rose-600', amber: 'bg-amber-600', cyan: 'bg-cyan-600', slate: 'bg-slate-600' };
+  return e('span', { className: `badge ${colors[color]||'bg-slate-600'}` }, children);
+}
+function ChakraProgress({value, color}) {
+  const colors = { red: 'bg-rose-500', cyan: 'bg-cyan-400', green: 'bg-emerald-400', amber: 'bg-amber-400' };
+  return e('div', { className: 'w-full bg-slate-800 rounded-full h-2 mt-3' },
+    e('div', { className: `progress-bar ${colors[color]||'bg-cyan-400'}`, style: { width: `${value}%` } })
+  );
+}
+function ChakraGrid({cols, children, className}) {
+  const colMap = { 1: 'grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4', 5: 'md:grid-cols-5' };
+  return e('div', { className: `grid grid-cols-1 ${colMap[cols]||''} gap-4 ${className||''}` }, children);
+}
+
+/* ─── Main App ─── */
+function App() {
+  const [s, setS] = useState({
+    orch: 'Healthy', orchSub: 'Closed / routing normally',
+    lat: 50, db: 50, queue: 0,
+    cb: 'CLOSED', fb: 'OFF',
+    agentState: 'Fast response',
+    txState: [1, 0, 0, 0], // 0=off 1=active 2=error 3=done
+    incident: false
+  });
+  const [logs, setLogs] = useState([{ t: now(), msg: '✅ Dashboard ready. Click "Simulate Deadlock" to begin.', c: 'emerald.300' }]);
+
+  function now() { return new Date().toLocaleTimeString('vi-VN'); }
+  function addLog(msg, c) { setLogs(prev => [{ t: now(), msg, c }, ...prev].slice(0, 8)); }
+
+  function simulate() {
+    setS({
+      orch: '⚠️ DEADLOCK', orchSub: 'Deadlock detected → degraded mode',
+      lat: 10000, db: 10000, queue: 18420,
+      cb: 'OPEN', fb: 'ON',
+      agentState: 'Too slow → circuit open',
+      txState: [3, 2, 0, 0],
+      incident: true
+    });
+    addLog('🔴 Orchestrator DEADLOCK: quá nhiều request chồng chéo → cạn tài nguyên', 'rose.300');
+    addLog('🔴 Circuit Breaker OPEN: ngừng gửi request tới Agent Kho', 'rose.300');
+    addLog('🟡 Graceful Degradation: tắt dashboard realtime + báo cáo, giữ đơn hàng + vận chuyển', 'amber.300');
+    addLog('🔵 Data Consistency: transaction RESERVED nhưng chưa CONFIRMED → reconciliation job chạy', 'cyan.400');
+  }
+
+  function halfOpen() {
+    setS(prev => ({
+      ...prev,
+      orch: '🔄 HALF-OPEN', orchSub: 'Testing Agent Kho with probe requests...',
+      lat: 800, db: 500, queue: 5200,
+      cb: 'HALF-OPEN',
+      agentState: 'Probing... 3 test requests sent',
+      txState: [3, 3, 0, 0],
+      incident: true
+    }));
+    addLog('🟡 Circuit Breaker → HALF-OPEN: gửi 3 probe requests tới Agent Kho', 'amber.300');
+    addLog('🔵 Reconciliation: đối soát RESERVED → Agent Kho xác nhận đã trừ kho thật', 'cyan.400');
+  }
+
+  function recover() {
+    setS({
+      orch: '✅ Healthy', orchSub: 'Closed / routing normally',
+      lat: 65, db: 80, queue: 42,
+      cb: 'CLOSED', fb: 'OFF',
+      agentState: 'Probes OK → normal operations',
+      txState: [3, 3, 3, 3],
+      incident: false
+    });
+    addLog('✅ Circuit Breaker → CLOSED: Agent Kho phản hồi OK', 'emerald.300');
+    addLog('✅ All features restored: dashboard, báo cáo, dự báo', 'emerald.300');
+    addLog('✅ Transaction CONFIRMED + RECONCILED: idempotency key TX-VE-8842 verified', 'emerald.300');
+  }
+
+  /* ─── Render ─── */
+  const cbColor = s.cb === 'OPEN' ? 'red' : s.cb === 'HALF-OPEN' ? 'amber' : 'green';
+  const dbPct = Math.min(100, (s.db / 10000) * 100);
+
+  return e('main', { className: 'max-w-7xl mx-auto p-4 md:p-6 space-y-5' },
+
+    /* Header */
+    e(ChakraCard, { className: 'animate__animated animate__fadeInDown' },
+      e('div', { className: 'flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4' },
+        e('div', null,
+          e(ChakraText, { size: 'sm', color: 'cyan.300', weight: 'semibold' }, 'MIS Talent 2026 • V-Express'),
+          e(ChakraHeading, { size: '2xl' }, 'Self‑Healing Multi‑Agent Dashboard'),
+          e(ChakraText, { color: 'slate.300', className: 'mt-2' }, 'Demo: Circuit Breaker • Graceful Degradation • Data Consistency')
+        ),
+        e('div', { className: 'flex flex-wrap gap-3' },
+          e(ChakraButton, { color: 'red', onClick: simulate, className: s.incident ? '' : 'animate__animated animate__pulse animate__infinite' }, '⚡ Simulate Deadlock'),
+          e(ChakraButton, { color: 'blue', onClick: halfOpen }, '🔄 Half-Open Probe'),
+          e(ChakraButton, { color: 'green', onClick: recover }, '✅ Recover')
+        )
+      )
+    ),
+
+    /* Status Cards */
+    e(ChakraGrid, { cols: 4 },
+      e(ChakraCard, { className: `animate__animated animate__fadeInUp ${s.incident ? 'border border-rose-500 animate__animated animate__shakeX' : ''}` },
+        e(ChakraText, { size: 'sm', color: 'slate.400' }, 'Orchestrator'),
+        e(ChakraHeading, { size: 'xl', className: 'mt-2' }, s.orch),
+        e(ChakraText, { size: 'sm', color: 'slate.300', className: 'mt-2' }, s.orchSub)
+      ),
+      e(ChakraCard, { className: 'animate__animated animate__fadeInUp' },
+        e(ChakraText, { size: 'sm', color: 'slate.400' }, 'Agent Kho Latency'),
+        e(ChakraHeading, { size: 'xl', className: 'mt-2' }, `${s.lat.toLocaleString()}ms`),
+        e('div', { className: 'flex items-center gap-2 mt-2' },
+          e('span', { className: `dot ${s.lat > 1000 ? 'bg-rose-400' : s.lat > 200 ? 'bg-amber-400' : 'bg-emerald-400'}` }),
+          e(ChakraText, { size: 'sm', color: 'slate.300' }, s.agentState)
+        )
+      ),
+      e(ChakraCard, { className: 'animate__animated animate__fadeInUp' },
+        e(ChakraText, { size: 'sm', color: 'slate.400' }, 'PostgreSQL Latency'),
+        e(ChakraHeading, { size: 'xl', className: 'mt-2' }, `${s.db.toLocaleString()}ms`),
+        e(ChakraProgress, { value: dbPct, color: s.db > 1000 ? 'red' : s.db > 200 ? 'amber' : 'cyan' })
+      ),
+      e(ChakraCard, { className: 'animate__animated animate__fadeInUp' },
+        e(ChakraText, { size: 'sm', color: 'slate.400' }, 'Queue Backlog'),
+        e(ChakraHeading, { size: 'xl', className: 'mt-2' }, `${s.queue.toLocaleString()} tasks`),
+        e(ChakraText, { size: 'sm', color: 'slate.300', className: 'mt-2' }, s.queue > 1000 ? 'Backpressure active' : s.queue > 0 ? 'Draining...' : 'Normal flow')
+      )
+    ),
+
+    /* Circuit Breaker + Graceful Degradation + Data Consistency */
+    e(ChakraGrid, { cols: 3, className: 'mt-1' },
+
+      /* Circuit Breaker */
+      e(ChakraCard, { className: 'animate__animated animate__fadeInUp' },
+        e(ChakraHeading, { size: 'lg', className: 'mb-4' }, '🔌 Circuit Breaker'),
+        e('div', { className: 'space-y-3' },
+          ['CLOSED', 'HALF-OPEN', 'OPEN'].map(state => {
+            const active = s.cb === state;
+            const colors = { CLOSED: 'border-emerald-500 bg-emerald-950/50', 'HALF-OPEN': 'border-amber-500 bg-amber-950/50', OPEN: 'border-rose-500 bg-rose-950/50' };
+            const labels = { CLOSED: 'Routing normally', 'HALF-OPEN': 'Probing agent...', OPEN: 'Requests blocked' };
+            return e('div', {
+              key: state,
+              className: `p-3 rounded-xl border ${active ? colors[state] : 'border-slate-700 bg-slate-800/50 opacity-40'} state-step ${active ? 'animate__animated animate__fadeIn' : ''}`
+            },
+              e('div', { className: 'flex items-center justify-between' },
+                e('span', { className: 'font-bold' }, state),
+                active ? e(ChakraBadge, { color: state === 'CLOSED' ? 'green' : state === 'HALF-OPEN' ? 'amber' : 'red' }, 'ACTIVE') : null
+              ),
+              active ? e(ChakraText, { size: 'xs', color: 'slate.300', className: 'mt-1' }, labels[state]) : null
+            );
+          })
+        ),
+        e('div', { className: 'mt-4 p-3 rounded-lg bg-slate-800/60 text-xs text-slate-400' },
+          'Logic: 5 timeout liên tiếp → OPEN → 30s → HALF-OPEN → 3 probe OK → CLOSED'
+        )
+      ),
+
+      /* Graceful Degradation */
+      e(ChakraCard, { className: 'animate__animated animate__fadeInUp' },
+        e(ChakraHeading, { size: 'lg', className: 'mb-4' }, '📉 Graceful Degradation'),
+        e('div', { className: 'space-y-3' },
+          e('div', { className: `p-3 rounded-xl border ${s.incident ? 'border-emerald-500 bg-emerald-950/50' : 'border-slate-700 bg-slate-800/50'}` },
+            e('p', { className: 'font-bold text-emerald-300 mb-2' }, '✅ Ưu tiên giữ'),
+            e('ul', { className: 'text-sm text-slate-300 list-disc ml-5 space-y-1' },
+              ['Xử lý đơn hàng mới', 'Cập nhật trạng thái vận chuyển', 'Reservation kho', 'Cảnh báo sự cố'].map(
+                i => e('li', { key: i }, i)
+              )
+            )
+          ),
+          e('div', { className: `p-3 rounded-xl border ${s.incident ? 'border-rose-500 bg-rose-950/50 animate__animated animate__fadeIn' : 'border-slate-700 bg-slate-800/50'}` },
+            e('p', { className: 'font-bold text-rose-300 mb-2' }, '❌ Tạm tắt khi quá tải'),
+            e('ul', { className: 'text-sm text-slate-300 list-disc ml-5 space-y-1' },
+              ['Dashboard realtime', 'Báo cáo phân tích nặng', 'Dự báo dài hạn', 'CSKH tự động (non-critical)'].map(
+                i => e('li', { key: i }, i)
+              )
+            )
+          )
+        )
+      ),
+
+      /* Transaction State / Data Consistency */
+      e(ChakraCard, { className: 'animate__animated animate__fadeInUp' },
+        e(ChakraHeading, { size: 'lg', className: 'mb-4' }, '🔗 Data Consistency'),
+        e('div', { className: 'space-y-2' },
+          ['PENDING', 'RESERVED', 'CONFIRMED', 'RECONCILED'].map((label, i) => {
+            const st = s.txState[i];
+            const bg = st === 3 ? 'bg-emerald-700 border-emerald-500' : st === 2 ? 'bg-rose-700 border-rose-500 animate__animated animate__shakeX' : st === 1 ? 'bg-cyan-700 border-cyan-500' : 'bg-slate-800 border-slate-700 opacity-40';
+            const icon = st === 3 ? '✅' : st === 2 ? '❌' : st === 1 ? '🔄' : '⬜';
+            return e('div', { key: label, className: `p-3 rounded-xl border ${bg} state-step flex items-center gap-3` },
+              e('span', null, icon),
+              e('span', { className: 'font-semibold' }, label),
+              st === 2 ? e(ChakraBadge, { color: 'red' }, 'STUCK') : null,
+              st === 3 ? e(ChakraBadge, { color: 'green' }, 'OK') : null
+            );
+          })
+        ),
+        e('div', { className: 'mt-4 p-3 rounded-lg bg-slate-800/60 text-xs text-slate-400' },
+          'Idempotency key + Saga compensation + Reconciliation job mỗi 30s'
+        )
+      )
+    ),
+
+    /* Event Timeline */
+    e(ChakraCard, { className: 'mt-1 animate__animated animate__fadeInUp' },
+      e(ChakraHeading, { size: 'lg', className: 'mb-4' }, '📋 Event Timeline'),
+      e('div', { className: 'space-y-2' },
+        logs.map((item, idx) =>
+          e('div', {
+            key: idx,
+            className: `p-3 rounded-lg bg-slate-900/70 flex items-start gap-3 ${idx === 0 ? 'animate__animated animate__fadeInLeft' : ''}`
+          },
+            e('span', { className: 'text-xs text-slate-500 whitespace-nowrap mt-0.5' }, item.t),
+            e(ChakraText, { size: 'sm', color: item.c }, item.msg)
+          )
+        )
+      )
+    ),
+
+    /* Footer */
+    e('div', { className: 'text-center text-xs text-slate-600 py-4' },
+      '🛠️ Built with: Tailwind CSS • Chakra-style Components (React) • Animate.css — MIS Talent 2026'
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+</script>
+</body>
+</html>
